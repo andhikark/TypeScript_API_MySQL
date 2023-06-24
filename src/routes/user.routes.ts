@@ -4,12 +4,53 @@ import bcrypt from 'bcrypt';
 import pool from "../config/db.connection";
 import generateToken from "../config/token.generate";
 import authenticate from "../config/authenticate.token";
+import axios from 'axios';
+
+
+var cacheService = require("express-api-cache");
+var cache = cacheService.cache;
 
 const saltround = 10;
 const userRouter = Router();
 
 userRouter.get('/', (request: Request, response: Response) => {
     return response.json("ok ");
+})
+
+userRouter.get('/all', authenticate, cache("10 minutes"),(req : Request, res : Response) => {
+    pool.getConnection(function(err: any, conn:any) {
+        if(err){
+            console.log('entered into error');
+            res.send({
+                success: false,
+                statusCode : 500,
+                message : 'Getting error during connection'
+            })
+
+            return;
+        }
+
+        //if you got connection 
+        conn.query('SELECT Id,Email,Mobile,InsertDateTimeUtc as CreatedDate FROM register', function(err: any, rows: any) {
+            if(err){
+                conn.release();
+                return res.send({
+                    success: false,
+                    statusCode : 400
+                });
+            }
+
+            //for simplicity just send the rows
+            res.send({
+                message : 'success',
+                statusCode: 200,
+                data : rows
+            });
+
+            //close connection 
+            conn.release();
+        });
+    });
 })
 
 
@@ -175,5 +216,27 @@ userRouter.post('/login', (req : Request, res : Response) => {
         
     })
 });
+
+userRouter.post('createUser',(req: Request, res : Response) => {
+    //call post api or register api 
+    axios.post('/user',{
+        email : 'fred',
+        password : 'blabla',
+        phone : '1234567890'
+    }).then(function(response){
+        console.log(response);
+        res.send({
+            message : 'user created',
+            statusCode: 200,
+        });
+
+    }).catch(function(error){
+        console.log(error);
+        res.send({
+            message : 'failed',
+            statusCode: 500
+        });
+    })
+})
 
 export default userRouter;
